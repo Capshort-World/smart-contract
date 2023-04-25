@@ -3110,7 +3110,7 @@ pragma solidity ^0.8.9;
 ////import "../../interfaces/IVesting.sol";
 ////import "../../core/libs/FullMath.sol";
 
-contract Vesting is IVesting, AccessControl, ReentrancyGuard {
+contract ManualVesting is IVesting, AccessControl, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.UintSet;
     using Counters for Counters.Counter;
@@ -3225,38 +3225,34 @@ contract Vesting is IVesting, AccessControl, ReentrancyGuard {
                 _rounds[i].allocated > 0,
                 "Allocated must be greater than zero"
             );
+            require(
+                _rounds[i].roundId <= roundIds.length(),
+                "Invalid provided roundId"
+            );
 
-            if (
-                _rounds[i].roundId == 0 ||
-                !roundIds.contains(_rounds[i].roundId)
-            ) {
-                uint256 newRoundId = roundIds.length() + 1;
-
-                rounds[newRoundId].roundId = newRoundId;
-                rounds[newRoundId].name = _rounds[i].name;
-                rounds[newRoundId].tgeRatio = _rounds[i].tgeRatio;
-                rounds[newRoundId].startTime = _rounds[i].startTime;
-                rounds[newRoundId].cliff = _rounds[i].cliff;
-                rounds[newRoundId].period = _rounds[i].period;
-                rounds[newRoundId].allocated = _rounds[i].allocated;
-                roundIds.add(newRoundId);
-
-                emit RoundSet(newRoundId);
+            uint256 roundId = _rounds[i].roundId == 0
+                ? roundIds.length() + 1
+                : _rounds[i].roundId;
+            if (!roundIds.contains(roundId)) {
+                roundIds.add(roundId);
             } else {
                 require(
-                    rounds[_rounds[i].roundId].startTime > block.timestamp,
+                    rounds[roundId].startTime > block.timestamp,
                     "Round has been started"
                 );
-
-                rounds[_rounds[i].roundId].name = _rounds[i].name;
-                rounds[_rounds[i].roundId].tgeRatio = _rounds[i].tgeRatio;
-                rounds[_rounds[i].roundId].startTime = _rounds[i].startTime;
-                rounds[_rounds[i].roundId].cliff = _rounds[i].cliff;
-                rounds[_rounds[i].roundId].period = _rounds[i].period;
-                rounds[_rounds[i].roundId].allocated = _rounds[i].allocated;
-
-                emit RoundSet(_rounds[i].roundId);
             }
+
+            rounds[roundId] = Round(
+                roundId,
+                _rounds[i].name,
+                _rounds[i].tgeRatio,
+                _rounds[i].startTime,
+                _rounds[i].cliff,
+                _rounds[i].period,
+                _rounds[i].allocated
+            );
+
+            emit RoundSet(roundId);
         }
     }
 
@@ -3275,6 +3271,10 @@ contract Vesting is IVesting, AccessControl, ReentrancyGuard {
                 "Invalid wallet address"
             );
             require(_beneficiaries[i].share > 0, "Invalid share");
+            require(
+                _beneficiaries[i].beneficiaryId <= beneficiaryIds.length(),
+                "Invalid provided beneficiaryId"
+            );
 
             uint256 roundId = _beneficiaries[i].round;
             require(roundIds.contains(roundId), "Invalid round");
@@ -3283,43 +3283,26 @@ contract Vesting is IVesting, AccessControl, ReentrancyGuard {
                 "Round has been started"
             );
 
-            if (
-                _beneficiaries[i].beneficiaryId == 0 ||
-                !beneficiaryIds.contains(_beneficiaries[i].beneficiaryId)
-            ) {
-                uint256 newBeneficiaryId = beneficiaryIds.length() + 1;
-
-                beneficiaries[newBeneficiaryId]
-                    .beneficiaryId = newBeneficiaryId;
-                beneficiaries[newBeneficiaryId].wallet = _beneficiaries[i]
-                    .wallet;
-                beneficiaries[newBeneficiaryId].share = _beneficiaries[i].share;
-                beneficiaries[newBeneficiaryId].released = _beneficiaries[i]
-                    .released;
-                beneficiaries[newBeneficiaryId].round = _beneficiaries[i].round;
-                beneficiaryIds.add(newBeneficiaryId);
-
-                emit BeneficiarySet(
-                    newBeneficiaryId,
-                    _beneficiaries[i].wallet,
-                    _beneficiaries[i].round
-                );
-            } else {
-                beneficiaries[_beneficiaries[i].beneficiaryId]
-                    .wallet = _beneficiaries[i].wallet;
-                beneficiaries[_beneficiaries[i].beneficiaryId]
-                    .share = _beneficiaries[i].share;
-                beneficiaries[_beneficiaries[i].beneficiaryId]
-                    .released = _beneficiaries[i].released;
-                beneficiaries[_beneficiaries[i].beneficiaryId]
-                    .round = _beneficiaries[i].round;
-
-                emit BeneficiarySet(
-                    _beneficiaries[i].beneficiaryId,
-                    _beneficiaries[i].wallet,
-                    _beneficiaries[i].round
-                );
+            uint256 beneficiaryId = _beneficiaries[i].beneficiaryId == 0
+                ? beneficiaryIds.length() + 1
+                : _beneficiaries[i].beneficiaryId;
+            if (!beneficiaryIds.contains(beneficiaryId)) {
+                beneficiaryIds.add(beneficiaryId);
             }
+
+            beneficiaries[beneficiaryId] = Beneficiary(
+                beneficiaryId,
+                _beneficiaries[i].wallet,
+                _beneficiaries[i].share,
+                _beneficiaries[i].released,
+                _beneficiaries[i].round
+            );
+
+            emit BeneficiarySet(
+                beneficiaryId,
+                _beneficiaries[i].wallet,
+                _beneficiaries[i].round
+            );
         }
     }
 
